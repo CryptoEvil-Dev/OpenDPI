@@ -26,8 +26,9 @@ endif()
 
 
 add_subdirectory(src/net)
+add_subdirectory(src/conf)
 add_executable(main main.cpp)
-target_link_libraries(main PRIVATE netlib)
+target_link_libraries(main PRIVATE netlib conflib)
 
 option(BUILD_TESTING "Build the testing suite" ON)
 if(BUILD_TESTING)

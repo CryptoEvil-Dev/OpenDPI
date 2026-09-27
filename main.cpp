@@ -89,6 +89,21 @@ int main(int argc, char **argv) {
                 "</html>";
                 
             conn.write(response);
+        } else {
+            std::string response = 
+                "HTTP/1.1 404 Not Found\r\n"
+                "Content-Type: text/html; charset=UTF-8\r\n"
+                "Content-Length: 112\r\n"
+                "Server: OpenDPI\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                "<!DOCTYPE html>\r\n"
+                "<html>\r\n"
+                "<head><title>OpenDPI WebUI</title></head>\r\n"
+                "<body><h1>404 Not Found</h1></body>\r\n"
+                "</html>";
+            
+            conn.write(response);
         }
 
         conn.close();
