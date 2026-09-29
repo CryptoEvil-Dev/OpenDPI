@@ -20,32 +20,78 @@ namespace conf {
  *
  * 
 */
+
+struct ValidationData {
+    std::string path;
+    std::string message;
+};
+
+class ValidationResult {
+public:
+    ValidationResult() = default;
+    ValidationResult(const ValidationResult&) = default;
+    ValidationResult(ValidationResult&&) noexcept;
+
+    ValidationResult& operator = (const ValidationResult&) = default;
+    ValidationResult& operator = (ValidationResult&&) noexcept;
+
+    void append(std::string path, std::string message) noexcept;
+    bool is_valid() const noexcept;
+
+    std::string get_log() const noexcept;
+    std::vector<ValidationData> get_raw_log() const noexcept;
+
+private:
+    std::vector<ValidationData> errors;
+};
+
 class IConf {
 public:
     virtual ~IConf() = default;
 
-    virtual net::SocketAddr dpi() const = 0;
-    virtual net::SocketAddr backend() const = 0;
+    virtual void reload(const std::string& path) = 0;
+
+    virtual net::SocketAddr dpi_addr() const noexcept = 0;
+    virtual net::SocketAddr backend_addr() const noexcept = 0;
 
     // TLS
-    virtual bool tls_enabled() const = 0; // Включен ли TLS.
-    virtual std::string tls_pubkey_path() const = 0; // Путь к TLS-публичному ключу.
-    virtual std::string tls_privkey_path() const = 0; // Путь к TLS-приватному ключу.
-    virtual std::string tls_renewal_path() const = 0; // Путь к TLS-Renewal.
+    virtual std::string pubkey() const noexcept = 0;
+    virtual std::string privkey() const noexcept = 0;
+    virtual std::string chainkey() const noexcept = 0;
+    virtual bool renewal() const noexcept = 0;
 
-    // Anonymous TCP-Requests
-    virtual std::chrono::milliseconds anonymous_ban_time() const = 0; // Время бана анонимных соединений.
-    virtual std::chrono::milliseconds anonymous_ban_time_after_honeypot() const = 0; // Время бана анонимных соединений после перехода на honeypot.
-    virtual uint64_t max_anonymous_packets_per_second() const = 0; // Максимальное количество пакетов от анонимного соединения в секунду.
+    // Anonymous TCP
+    virtual std::chrono::seconds ban_duration() const noexcept = 0;
+    virtual uint64_t max_rps() const noexcept = 0;
+    virtual std::chrono::seconds max_session_duration() const noexcept = 0;
+    virtual uint64_t max_packet_size() const noexcept = 0;
 
-    // Anonymous Web-Sockets
-    virtual std::chrono::milliseconds anonymous_websocket_ban_time() const = 0; // Время бана анонимных Web-Sockets.
-
-
-    // Other
-    virtual std::vector<std::string> honeypots() const = 0; // Список honeypot маршрутов.
-    virtual std::vector<net::IpAddr> angels() const = 0; // Список IP-адресов на которых не распространяются правила фильтрации.
-    virtual std::vector<net::IpAddr> web_ui_for() const = 0; // Список IP-адресов, которым доступен веб-интерфейс.
+private:
+    virtual ValidationResult validate(const std::string& config) = 0;
 };
+
+
+
+#ifdef INSIDER_MODE
+
+/*
+ * Универсальный валидатор.
+ * Идея разделить извлечение данных (свой слой для каждого формата) и проверку типов (общий слой)
+ * IConfigReader - базовый класс, который релизуют парсеры (YAML, JSON, TOML, XML)
+ * SchemaValidator - Универсальный валидатор, принимающий парсер и валидирующий данные
+ * 
+ * При таком подходе, от IConf можно будет отказаться
+ * 
+*/
+
+#include <optional>
+
+class IConfigReader {
+public:
+    virtual ~IConfigReader() = default;
+    virtual std::optional<std::string_view> get_value(std::string_view path) const = 0;
+};
+
+#endif
 
 }
