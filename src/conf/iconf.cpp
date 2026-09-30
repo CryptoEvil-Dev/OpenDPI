@@ -37,8 +37,7 @@ std::vector<ValidationData> ValidationResult::get_raw_log() const noexcept {
 }
 
 
-
-#ifdef INSIDER_MODE
+// SchemaValidator
 
 SchemaValidator::SchemaValidator(SchemaValidator&& other) noexcept {
     this->_res = std::move(other._res);
@@ -52,9 +51,8 @@ SchemaValidator& SchemaValidator::operator = (SchemaValidator&& other) noexcept 
 }
 
 
-ValidationResult&& SchemaValidator::release() {
+ValidationResult SchemaValidator::release() {
     return std::move(this->_res);
 }
 
-#endif
 }

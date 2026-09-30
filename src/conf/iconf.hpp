@@ -1,25 +1,11 @@
 #pragma once
-
 #include <net/addrs.hpp>
-
 #include <stdint.h>
-
 #include <string>
 #include <vector>
-
-#include <chrono>
+#include <optional>
 
 namespace conf {
-
-// TODO!
-/*
- * Спроектировать поля, которые будут передаваться в конфигурационном файле.
- * - Можно взять впринципе готовую конфигурацию из Rust репозитория, но изменить типы данных.
- * - Конфигурация не обязана шустро работать, но получать значения из неё нужно моментально.
- * - Реализовать сначала парсинг YAML конфигурации, потом можно будет реализовывать и иные форматы.
- *
- * 
-*/
 
 struct ValidationData {
     std::string path;
@@ -45,48 +31,7 @@ private:
     std::vector<ValidationData> errors;
 };
 
-class IConf {
-public:
-    virtual ~IConf() = default;
 
-    virtual void reload(const std::string& path) = 0;
-
-    virtual net::SocketAddr dpi_addr() const noexcept = 0;
-    virtual net::SocketAddr backend_addr() const noexcept = 0;
-
-    // TLS
-    virtual std::string pubkey() const noexcept = 0;
-    virtual std::string privkey() const noexcept = 0;
-    virtual std::string chainkey() const noexcept = 0;
-    virtual bool renewal() const noexcept = 0;
-
-    // Anonymous TCP
-    virtual std::chrono::seconds ban_duration() const noexcept = 0;
-    virtual uint64_t max_rps() const noexcept = 0;
-    virtual std::chrono::seconds max_session_duration() const noexcept = 0;
-    virtual uint64_t max_packet_size() const noexcept = 0;
-
-private:
-    virtual ValidationResult validate(const std::string& config) = 0;
-};
-
-
-#define INSIDER_MODE
-#ifdef INSIDER_MODE
-
-/*
- * Универсальный валидатор.
- * Идея разделить извлечение данных (свой слой для каждого формата) и проверку типов (общий слой)
- * IConfigReader - базовый класс, который релизуют парсеры (YAML, JSON, TOML, XML)
- * SchemaValidator - Универсальный валидатор, принимающий парсер и валидирующий данные.
- * 
- * При таком подходе, от IConf можно будет отказаться.
- * 
- * Появилось предложение добавить Constraint'ы для первичного анализа данных, так будет ещё проще валидировать данные
- * 
-*/
-
-#include <optional>
 
 template<typename T>
 struct NumericConstraint {
@@ -114,7 +59,7 @@ public:
 class SchemaValidator {
 public:
     SchemaValidator() = default;
-    SchemaValidator(const SchemaValidator&) = default;
+    // SchemaValidator(const SchemaValidator&) = default;
     SchemaValidator(SchemaValidator&&) noexcept;
 
     SchemaValidator& operator = (const SchemaValidator&) = default;
@@ -127,17 +72,17 @@ public:
     template<typename T> requires std::integral<T>
     SchemaValidator& check_numeric(const IConfigReader& reader, const char* path);
 
-    template<typename T> requires std::convertible_to<T, std::string_view>
+    // template<typename T> requires std::convertible_to<T, std::string_view>
     SchemaValidator& check_string(const IConfigReader& reader, const char* path);
 
     // With constraints
     template<typename T> requires std::integral<T>
     SchemaValidator& check_numeric(const IConfigReader& reader, const char* path, NumericConstraint<T> constraint);
 
-    template<typename T> requires std::convertible_to<T, std::string_view>
+    // template<typename T> requires std::convertible_to<T, std::string_view>
     SchemaValidator& check_string(const IConfigReader& reader, const char* path, StringConstraint constraint);
 
-    ValidationResult&& release();
+    ValidationResult release();
 
 private:
     ValidationResult _res;
@@ -146,14 +91,14 @@ private:
 
 
 template<typename T>
-SchemaValidator& SchemaValidator::check_anytype(const IConfigReader& reader, const char* path) {
+inline SchemaValidator& SchemaValidator::check_anytype(const IConfigReader& reader, const char* path) {
     auto val = reader.get_value(path);
     if(!val.has_value()) {
         this->_res.append(path, "is missing, empty or invalid");
         return *this;
     }
     try {
-        T{*val};
+        T{std::string(*val)};
     } catch(...) {
         this->_res.append(path, "invalid value");
     }
@@ -161,7 +106,7 @@ SchemaValidator& SchemaValidator::check_anytype(const IConfigReader& reader, con
 }
 
 template<typename T> requires std::integral<T>
-SchemaValidator& SchemaValidator::check_numeric(const IConfigReader& reader, const char* path) {
+inline SchemaValidator& SchemaValidator::check_numeric(const IConfigReader& reader, const char* path) {
     auto val = reader.get_value(path);
     if(!val.has_value()) {
         this->_res.append(path, "is missing, empty or invalid");
@@ -175,8 +120,8 @@ SchemaValidator& SchemaValidator::check_numeric(const IConfigReader& reader, con
     return *this;
 }
 
-template<typename T> requires std::convertible_to<T, std::string_view>
-SchemaValidator& SchemaValidator::check_string(const IConfigReader& reader, const char* path) {
+// template<typename T> requires std::convertible_to<T, std::string_view>
+inline SchemaValidator& SchemaValidator::check_string(const IConfigReader& reader, const char* path) {
     auto val = reader.get_value(path);
     if(!val.has_value()) {
         this->_res.append(path, "is missing, empty or invalid");
@@ -185,7 +130,7 @@ SchemaValidator& SchemaValidator::check_string(const IConfigReader& reader, cons
 }
 
 template<typename T> requires std::integral<T>
-SchemaValidator& SchemaValidator::check_numeric(const IConfigReader& reader, const char* path, NumericConstraint<T> constraint) {
+inline SchemaValidator& SchemaValidator::check_numeric(const IConfigReader& reader, const char* path, NumericConstraint<T> constraint) {
     auto val = reader.get_value(path);
     if(!val.has_value()) {
         this->_res.append(path, "is missing, empty or invalid");
@@ -211,8 +156,8 @@ SchemaValidator& SchemaValidator::check_numeric(const IConfigReader& reader, con
     return *this;
 }
 
-template<typename T> requires std::convertible_to<T, std::string_view>
-SchemaValidator& SchemaValidator::check_string(const IConfigReader& reader, const char* path, StringConstraint constraint) {
+// template<typename T> requires std::convertible_to<T, std::string_view>
+inline SchemaValidator& SchemaValidator::check_string(const IConfigReader& reader, const char* path, StringConstraint constraint) {
     auto val = reader.get_value(path);
     if(!val) {
         this->_res.append(path, "is missing, empty or invalid");
@@ -233,7 +178,5 @@ SchemaValidator& SchemaValidator::check_string(const IConfigReader& reader, cons
     return *this;
 }
 
-
-#endif
 
 }

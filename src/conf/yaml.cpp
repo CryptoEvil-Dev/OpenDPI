@@ -1,130 +1,82 @@
 #include <conf/yaml.hpp>
-#include <iostream>
+#include <ryml.hpp>
 #include <fstream>
-#include <sstream>
-
+#include <filesystem>
 
 namespace conf {
 
-YAML::YAML(const std::string& path) {
+struct RyamlConfigReader::Impl {
+    ryml::Tree tree;
+};
+
+RyamlConfigReader::RyamlConfigReader(const std::string& path) : _impl(std::make_unique<Impl>()) {
+    {
+        std::filesystem::path _file(path);
+        if(!std::filesystem::exists(_file)) {
+            throw std::system_error(std::make_error_code(std::errc::no_such_file_or_directory));
+        }
+    }
+
     std::ifstream file(path);
     if(!file.is_open()) {
-        throw std::errc::no_such_file_or_directory;
+        if(errno == EACCES || errno == EPERM)
+            throw std::system_error(std::make_error_code(std::errc::permission_denied));
+        else {
+            std::string err_buf;
+            std::format_to(std::back_inserter(err_buf), "Ошибка при открытии файла: {}", errno);
+            throw std::runtime_error(err_buf);
+        }
     }
 
     std::stringstream buffer;
     buffer << file.rdbuf();
     std::string content = buffer.str();
-
-    this->yaml = ryml::parse_in_arena(ryml::to_csubstr(content));
+    
+    try {
+        this->_impl->tree = ryml::parse_in_arena(ryml::csubstr{content.data(), content.size()});
+    } catch(const std::exception&) {
+        throw std::runtime_error("syntax error");
+    }
 }
 
-YAML::YAML(YAML&& other) noexcept {
-    this->yaml = std::move(other.yaml);
+RyamlConfigReader::RyamlConfigReader(RyamlConfigReader&& other) noexcept {
+    this->_impl->tree = std::move(other._impl->tree);
 }
 
-YAML& YAML::operator = (YAML&& other) noexcept {
+RyamlConfigReader::~RyamlConfigReader() = default;
+
+RyamlConfigReader& RyamlConfigReader::operator = (RyamlConfigReader&& other) noexcept {
     if(this != &other) {
-        this->yaml = std::move(other.yaml);
+        this->_impl->tree = std::move(other._impl->tree);
     }
     return *this;
 }
 
-void YAML::reload(const std::string& path) {
-    std::ifstream file(path);
-    if(!file.is_open()) {
-        throw std::errc::no_such_file_or_directory;
+std::optional<std::string_view> RyamlConfigReader::get_value(std::string_view path) const {
+    ryml::ConstNodeRef root = this->_impl->tree.rootref();
+
+    auto move = [&root](std::string_view _path) -> void {
+        if(root.invalid()) return;
+        root = root.find_child(c4::csubstr{_path.data(), _path.size()});
+    };
+
+    size_t start = 0;
+    while (start <= path.size())
+    {
+        size_t pos = path.find('.', start);
+        if(pos == std::string_view::npos) {
+            move(path.substr(start));
+            break;
+        }
+        move(path.substr(start, pos - start));
+        start = pos + 1;
     }
-
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string content = buffer.str();
-
     
-
-    this->yaml.clear();
-    ryml::parse_in_arena(ryml::to_csubstr(content), this->yaml);
+    if(root.invalid()) return std::nullopt;
+    if(!root.has_val()) return std::nullopt;
+    c4::csubstr raw = root.val();
+    return std::string_view(raw.str, raw.len);
 }
 
-
-
-
-
-namespace {
-    ryml::NodeRef safe_find(ryml::NodeRef root, std::initializer_list<const char*> path) {
-        ryml::NodeRef current = root;
-        for(const char* key : path) {
-            if(current.invalid()) return current;
-            current = current.find_child(key);
-        }
-
-        return current;
-    }
-}
-
-
-// In Progress
-ValidationResult YAML::validate(const std::string& config) {
-    ValidationResult res;
-    ryml::Tree tree;
-    try {
-        tree = ryml::parse_in_arena(ryml::to_csubstr(config));
-    } catch(const std::exception& ex) {
-        res.append("global", "Syntax Error");
-        return res;
-    }
-
-    ryml::NodeRef root = tree.rootref();
-
-    {
-        ryml::NodeRef ref = safe_find(root, {"system", "dpi"});
-        if(!ref.invalid() && ref.has_val() && !ref.empty()) {
-            try {
-                c4::csubstr raw = ref.val();
-                std::string_view sv(raw.str, raw.len);
-                net::SocketAddr{sv};
-            } catch(...) {
-                res.append("system.dpi", "invalid value");
-            }
-        } else {
-            res.append("system.dpi", "is missing, empty or invalid");
-        }
-    }
-
-    {
-        ryml::NodeRef ref = safe_find(root, {"system", "backend"});
-        if(!ref.invalid() && ref.has_val() && !ref.empty()) {
-            try {
-                c4::csubstr raw = ref.val();
-                std::string_view sv(raw.str, raw.len);
-                net::SocketAddr{sv};
-            } catch(...) {
-                res.append("system.backend", "invalid value");
-            }
-        } else {
-            res.append("system.backend", "is missing, empty or invalid");
-        }
-    }
-
-    {
-        ryml::NodeRef ref = safe_find(root, {"filter", "anonymous", "rps"});
-        if(!ref.invalid() && ref.has_val() && !ref.empty()) {
-            c4::csubstr raw = ref.val();
-            std::string_view sv(raw.str, raw.len);
-            uint64_t value = 0;
-
-            auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), value);
-            if(ec != std::errc{}) {
-                res.append("filter.anonymous.rps", "invalid value");
-            } else {
-                res.append("filter.anonymous.rps", "is missing, empty or invalid");
-            }
-        }
-    }
-
-    
-
-    return res;
-}
 
 }
