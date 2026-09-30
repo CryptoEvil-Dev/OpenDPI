@@ -27,7 +27,7 @@ bool ValidationResult::is_valid() const noexcept {
 std::string ValidationResult::get_log() const noexcept {
     std::string buffer;
     for(const ValidationData& dt : this->errors) {
-        std::format_to(std::back_inserter(buffer), "[{}] {}", dt.path, dt.message);
+        std::format_to(std::back_inserter(buffer), "[{}] {}\n", dt.path, dt.message);
     }
     return buffer;
 }
@@ -36,4 +36,25 @@ std::vector<ValidationData> ValidationResult::get_raw_log() const noexcept {
     return this->errors;
 }
 
+
+
+#ifdef INSIDER_MODE
+
+SchemaValidator::SchemaValidator(SchemaValidator&& other) noexcept {
+    this->_res = std::move(other._res);
+}
+
+SchemaValidator& SchemaValidator::operator = (SchemaValidator&& other) noexcept {
+    if(this != &other) {
+        this->_res = std::move(other._res);
+    }
+    return *this;
+}
+
+
+ValidationResult&& SchemaValidator::release() {
+    return std::move(this->_res);
+}
+
+#endif
 }
