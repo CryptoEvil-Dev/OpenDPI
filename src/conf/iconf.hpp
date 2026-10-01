@@ -53,6 +53,7 @@ class IConfigReader {
 public:
     virtual ~IConfigReader() = default;
     virtual std::optional<std::string_view> get_value(std::string_view path) const = 0;
+    virtual std::optional<std::vector<std::string_view>> get_sequence(std::string_view path) const = 0;
 };
 
 

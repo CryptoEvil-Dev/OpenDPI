@@ -31,7 +31,7 @@ RyamlConfigReader::RyamlConfigReader(const std::string& path) : _impl(std::make_
     std::stringstream buffer;
     buffer << file.rdbuf();
     std::string content = buffer.str();
-    
+
     try {
         this->_impl->tree = ryml::parse_in_arena(ryml::csubstr{content.data(), content.size()});
     } catch(const std::exception&) {
@@ -52,31 +52,55 @@ RyamlConfigReader& RyamlConfigReader::operator = (RyamlConfigReader&& other) noe
     return *this;
 }
 
-std::optional<std::string_view> RyamlConfigReader::get_value(std::string_view path) const {
-    ryml::ConstNodeRef root = this->_impl->tree.rootref();
+namespace {
+    bool navigate(ryml::ConstNodeRef& node, std::string_view path) {
+        if(path.empty()) return false;
 
-    auto move = [&root](std::string_view _path) -> void {
-        if(root.invalid()) return;
-        root = root.find_child(c4::csubstr{_path.data(), _path.size()});
-    };
+        size_t start = 0;
+        while (start <= path.size()) {
+            size_t pos = path.find('.', start);
 
-    size_t start = 0;
-    while (start <= path.size())
-    {
-        size_t pos = path.find('.', start);
-        if(pos == std::string_view::npos) {
-            move(path.substr(start));
-            break;
+            std::string_view segment;
+            if(pos == std::string_view::npos) {
+                segment = path.substr(start);
+                start = path.size() + 1;
+            } else {
+                segment = path.substr(start, pos - start);
+                start = pos + 1;
+            }
+
+            if(segment.empty()) return false;
+            node = node.find_child(c4::csubstr{segment.data(), segment.size()});
+            if(node.invalid()) return false;
         }
-        move(path.substr(start, pos - start));
-        start = pos + 1;
+        return true;
     }
-    
-    if(root.invalid()) return std::nullopt;
-    if(!root.has_val()) return std::nullopt;
-    c4::csubstr raw = root.val();
+}
+
+std::optional<std::string_view> RyamlConfigReader::get_value(std::string_view path) const {
+    ryml::ConstNodeRef node = this->_impl->tree.rootref();
+
+    if(!navigate(node, path)) return std::nullopt;
+    if(!node.has_val()) return std::nullopt;
+    c4::csubstr raw = node.val();
     return std::string_view(raw.str, raw.len);
 }
 
+std::optional<std::vector<std::string_view>> RyamlConfigReader::get_sequence(std::string_view path) const {
+    ryml::ConstNodeRef node = this->_impl->tree.rootref();
+
+    if(!navigate(node, path)) return std::nullopt;
+    if(!node.is_seq()) return std::nullopt;
+
+    std::vector<std::string_view> result;
+    result.reserve(node.num_children());
+    for(ryml::ConstNodeRef child : node) {
+        if(!child.has_val()) continue;
+        c4::csubstr raw = child.val();
+        result.emplace_back(raw.str, raw.len);
+    }
+
+    return result;
+}
 
 }

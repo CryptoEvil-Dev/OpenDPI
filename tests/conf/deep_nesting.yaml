@@ -4,9 +4,57 @@ hello:
       my:
         configuration:
           file: "Hello World!"
+        sequence:
+          - Hello!
+          - This
+          - is
+          - sequence
+          - in
+          - yaml
+          - file
   have:
     a:
       nice:
         day: "bruh"
       good:
         day: "bruh"
+seqs:
+  node1:
+    - node11
+    - node12
+    - node13
+    - node14
+    - node15
+  node2:
+    - node21
+    - node22
+    - node23
+    - node24
+    - node25
+  node3:
+    - node31
+    - node32
+    - node33
+    - node34
+    - node35
+  node4:
+    - node41
+    - node42
+    - node43
+    - node44
+    - node45
+  node5:
+    - node51
+    - node52
+    - node53
+    - node54
+    - node55
+dup:
+  node1:
+    - node1
+    - node2
+    - node3
+  node1:
+    - node2
+    - node3
+    - node4
