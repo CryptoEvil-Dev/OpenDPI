@@ -9,6 +9,8 @@
 
 namespace net {
 
+TcpStream::TcpStream(TcpStream&& other) noexcept : fd(std::exchange(other.fd, -1)), peer(std::move(other.peer)) {};
+
 TcpStream::~TcpStream() {
     if(this->fd != -1) ::close(this->fd);
 }
@@ -29,27 +31,27 @@ TcpStream TcpStream::connect(net::SocketAddr conn) {
         ::close(fd);
         switch(serr) {
             case ECONNREFUSED:
-                throw std::errc::connection_refused;
+                throw std::system_error(std::make_error_code(std::errc::connection_refused));
             case ETIMEDOUT:
-                throw std::errc::timed_out;
+                throw std::system_error(std::make_error_code(std::errc::timed_out));
             case ENETUNREACH:
-                throw std::errc::network_unreachable;
+                throw std::system_error(std::make_error_code(std::errc::network_unreachable));
             case EHOSTUNREACH:
-                throw std::errc::host_unreachable;
+                throw std::system_error(std::make_error_code(std::errc::host_unreachable));
             case EADDRNOTAVAIL:
-                throw std::errc::address_not_available;
+                throw std::system_error(std::make_error_code(std::errc::address_not_available));
             case EALREADY:
-                throw std::errc::connection_already_in_progress;
+                throw std::system_error(std::make_error_code(std::errc::connection_already_in_progress));
             case EISCONN:
-                throw std::errc::already_connected;
+                throw std::system_error(std::make_error_code(std::errc::already_connected));
             case EACCES:
-                throw std::errc::permission_denied;
+                throw std::system_error(std::make_error_code(std::errc::permission_denied));
             case EPERM:
-                throw std::errc::permission_denied;
+                throw std::system_error(std::make_error_code(std::errc::permission_denied));
             case EAFNOSUPPORT:
-                throw std::errc::address_family_not_supported;
+                throw std::system_error(std::make_error_code(std::errc::address_family_not_supported));
             case EINTR:
-                throw std::errc::interrupted;
+                throw std::system_error(std::make_error_code(std::errc::interrupted));
             default:
                 throw std::runtime_error("[UNDEF]: " + std::to_string(serr));
         }
@@ -116,7 +118,7 @@ void TcpStream::close() noexcept {
 }
 
 
-
+TcpListener::TcpListener(TcpListener&& other) noexcept : fd(std::exchange(other.fd, -1)), addr(std::move(other.addr)) {};
 
 TcpListener& TcpListener::operator = (TcpListener&& other) noexcept {
     if(this != &other) {
@@ -134,7 +136,7 @@ TcpListener::~TcpListener() {
 
 TcpListener TcpListener::bind(const SocketAddr& addr) {
     int fd = ::socket(AF_INET, SOCK_STREAM, 0);
-    if(fd < 0) throw std::errc::bad_file_descriptor;
+    if(fd < 0) throw std::system_error(std::make_error_code(std::errc::bad_file_descriptor));
 
     {
         int opt = 1;
@@ -143,27 +145,55 @@ TcpListener TcpListener::bind(const SocketAddr& addr) {
 
     if(::bind(fd, &addr.as_sockaddr(), addr.as_socklen_t()) < 0) {
         ::close(fd);
-        throw std::errc::address_in_use;
+        throw std::system_error(std::make_error_code(std::errc::address_in_use));
     }
 
     if(::listen(fd, SOMAXCONN) < 0) {
         ::close(fd);
-        throw std::errc::connection_refused;
+        throw std::system_error(std::make_error_code(std::errc::connection_refused));
     }
     
     return TcpListener(addr, fd);
 }
 
 TcpStream TcpListener::accept() {
+    if(this->fd == -1) throw std::system_error(std::make_error_code(std::errc::bad_file_descriptor));
     sockaddr_in _addr = {};
-    socklen_t _addr_l = sizeof(_addr);
+    socklen_t _addr_l = {};
 
-    int peer = ::accept(this->fd, reinterpret_cast<sockaddr*>(&_addr), &_addr_l);
-    if(peer < 0) [[unlikely]] throw std::errc::connection_aborted;
+    while(true) {
+        _addr_l = sizeof(_addr);
+        int peer = ::accept(this->fd, reinterpret_cast<sockaddr*>(&_addr), &_addr_l);
+        if(peer >= 0) {
+            SocketAddr sa = _addr;
+            return TcpStream(peer, sa);
+        }
 
-    SocketAddr sa = _addr;
-
-    return TcpStream(peer, sa);
+        // accept() failed
+        int serr = errno;
+        switch(serr) {
+            case EINTR:
+                continue;   // Сигнал прерыван - пропускаем
+            case ECONNABORTED:
+                continue;   // Соединение умерло до accept - пропускаем
+            case EPROTO:
+                continue;   // Handshake не завершился - пропускаем
+            case EMFILE:
+            case ENFILE:
+                throw std::system_error(std::make_error_code(std::errc::too_many_files_open));
+            case ENOBUFS:
+            case ENOMEM:
+                throw std::system_error(std::make_error_code(std::errc::not_enough_memory));
+            case EBADF:
+            case EINVAL:
+            case ENOTSOCK:
+            case EOPNOTSUPP:
+            case EFAULT:
+                throw std::system_error(std::make_error_code(std::errc::bad_file_descriptor));
+            default:
+                throw std::system_error(errno, std::generic_category(), "accept");
+        }
+    }
 }
 
 // NO RECOMENDED!

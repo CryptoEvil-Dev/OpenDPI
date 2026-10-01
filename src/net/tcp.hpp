@@ -6,7 +6,7 @@ namespace net {
 class TcpStream {
 public:
     TcpStream(const TcpStream&) = delete;
-    TcpStream(TcpStream&& other) noexcept : fd(std::move(other.fd)), peer(std::move(other.peer)) {};
+    TcpStream(TcpStream&& other) noexcept;
 
     ~TcpStream();
 
@@ -36,7 +36,7 @@ private:
 class TcpListener {
 public:
     TcpListener(const TcpListener&) = delete;
-    TcpListener(TcpListener&& other) noexcept : fd(std::move(other.fd)), addr(std::move(other.addr)) {};
+    TcpListener(TcpListener&& other) noexcept;
 
     ~TcpListener();
 
