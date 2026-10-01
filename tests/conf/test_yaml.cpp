@@ -86,3 +86,28 @@ TEST(RyamlTest, Duplicates) {
     EXPECT_EQ(seq[1], "node2");
     EXPECT_EQ(seq[2], "node3");
 }
+
+TEST(RyamlTest, MismatchField) {
+    conf::RyamlConfigReader reader("deep_nesting.yaml");
+    std::string path_buffer = "seqs.node1";
+
+    try {
+        std::string_view result = reader.get_value(path_buffer).value();
+        FAIL() << "Expected: bad optional access";
+    } catch(const std::exception& ex) {
+        EXPECT_STREQ(ex.what(), "bad optional access");
+    }
+
+}
+
+TEST(RyamlTest, MismatchField2) {
+    conf::RyamlConfigReader reader("deep_nesting.yaml");
+    std::string path_buffer = "hello.have.a.nice.day";
+
+    try {
+        std::vector<std::string_view> seq = reader.get_sequence(path_buffer).value();
+        FAIL() << "Expected: bad optional access";
+    } catch(const std::exception& ex) {
+        EXPECT_STREQ(ex.what(), "bad optional access");
+    }
+}
