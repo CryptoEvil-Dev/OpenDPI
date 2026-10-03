@@ -4,80 +4,77 @@
 #include <conf/yaml.hpp>
 
 
-class MicroCore {
-public:
-    MicroCore() {
-        this->config = std::make_unique<conf::RyamlConfigReader>("config.yaml");
-        std::string yaml_path = "system.dpi";
-        this->listener = std::make_unique<net::TcpListener>(net::TcpListener::bind(net::SocketAddr(this->config->get_value(yaml_path).value())));
-    }
-    MicroCore(const MicroCore&) = delete;
-    MicroCore(MicroCore&&) = delete;
-    MicroCore& operator = (const MicroCore&) = delete;
-    MicroCore& operator = (MicroCore&) = delete;
+// class MicroCore {
+// public:
+//     MicroCore() {
+//         this->config = std::make_unique<conf::RyamlConfigReader>("config.yaml");
+//         std::string yaml_path = "system.dpi";
+//         this->listener = std::make_unique<net::TcpListener>(net::TcpListener::bind(net::SocketAddr(this->config->get_value(yaml_path).value())));
+//     }
+//     MicroCore(const MicroCore&) = delete;
+//     MicroCore(MicroCore&&) = delete;
+//     MicroCore& operator = (const MicroCore&) = delete;
+//     MicroCore& operator = (MicroCore&) = delete;
 
 
-    net::SocketAddr dpi_addr() const {
-        std::string path = "system.dpi";
-        return net::SocketAddr(this->config->get_value(path).value());
-    }
-    net::SocketAddr backend_addr() const {
-        std::string path = "system.backend";
-        return net::SocketAddr(this->config->get_value(path).value());
-    };
+//     net::SocketAddr dpi_addr() const {
+//         std::string path = "system.dpi";
+//         return net::SocketAddr(this->config->get_value(path).value());
+//     }
+//     net::SocketAddr backend_addr() const {
+//         std::string path = "system.backend";
+//         return net::SocketAddr(this->config->get_value(path).value());
+//     };
 
-    void reload() {
-        auto new_config = std::make_unique<conf::RyamlConfigReader>("config.yaml");
-        auto dpi_str = new_config->get_value("system.dpi").value();
-        auto new_addr = net::SocketAddr(dpi_str);
+//     void reload() {
+//         auto new_config = std::make_unique<conf::RyamlConfigReader>("config.yaml");
+//         auto dpi_str = new_config->get_value("system.dpi").value();
+//         auto new_addr = net::SocketAddr(dpi_str);
 
-        auto new_listener = net::TcpListener::bind(new_addr);
-        auto new_listener_ptr = std::make_unique<net::TcpListener>(std::move(new_listener));
+//         auto new_listener = net::TcpListener::bind(new_addr);
+//         auto new_listener_ptr = std::make_unique<net::TcpListener>(std::move(new_listener));
 
-        this->config = std::move(new_config);
-        this->listener->close();
-        this->listener = std::move(new_listener_ptr);
-        // this->config = std::make_unique<conf::RyamlConfigReader>("config.yaml");
-        // this->listener->close();
-        // std::string yaml_path = "system.dpi";
-        // this->listener = std::make_unique<net::TcpListener>(net::TcpListener::bind(net::SocketAddr(this->config->get_value(yaml_path).value())));
-    }
+//         this->config = std::move(new_config);
+//         this->listener->close();
+//         this->listener = std::move(new_listener_ptr);
+//     }
 
-    std::unique_ptr<net::TcpStream> accept() {
-        return std::make_unique<net::TcpStream>(this->listener->accept());
-    }
+//     std::unique_ptr<net::TcpStream> accept() {
+//         return std::make_unique<net::TcpStream>(this->listener->accept());
+//     }
 
 
-private:
-    std::unique_ptr<conf::IConfigReader> config;
-    std::unique_ptr<net::TcpListener> listener;
-};
-
-
+// private:
+//     std::unique_ptr<conf::IConfigReader> config;
+//     std::unique_ptr<net::TcpListener> listener;
+// };
 
 
 int main() {
-    MicroCore _core;
-    std::cout << "DPI: " << _core.dpi_addr() << std::endl;
-    std::cout << "BCK: " << _core.backend_addr() << std::endl;
+    // MicroCore _core;
+    // std::cout << "DPI: " << _core.dpi_addr() << std::endl;
+    // std::cout << "BCK: " << _core.backend_addr() << std::endl;
 
-    while(true) {
-        auto conn = _core.accept();
-        std::cout << "conn created: " << conn->descriptor() << std::endl;
-        std::string buffer;
-        buffer.resize(1500);
+    // while(true) {
+    //     auto conn = _core.accept();
+    //     std::cout << "conn created: " << conn->descriptor() << std::endl;
+    //     std::string buffer;
+    //     buffer.resize(1500);
         
-        ssize_t rd = conn->read(buffer);
-        conn->write(buffer);
-        conn->close();
+    //     ssize_t rd = conn->read(buffer);
+    //     conn->write(buffer);
+    //     conn->close();
 
-        if(rd == -1) continue;
-        buffer.resize(rd);
-        if(buffer == "reload\n") {
-            _core.reload();
-            std::cout << "Config reloaded!" << std::endl;
-        }
-    }
+    //     if(rd == -1) continue;
+    //     buffer.resize(rd);
+    //     if(buffer == "reload\n") {
+    //         _core.reload();
+    //         std::cout << "Config reloaded!" << std::endl;
+    //     }
+    // }
+
+
+    return 0;
 }
 
 

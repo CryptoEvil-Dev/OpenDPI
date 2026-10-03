@@ -65,30 +65,86 @@ SocketAddr TcpStream::peer_addr() const noexcept {
 }
 
 
-ssize_t TcpStream::read(std::span<char> buffer) noexcept {
-    if(buffer.empty()) return 0;
+// ssize_t TcpStream::read(std::span<char> buffer) noexcept {
+//     if(buffer.empty()) return 0;
+//     while(true) {
+//         ssize_t _rd = ::read(this->fd, buffer.data(), buffer.size());
+//         if(_rd < 0) [[unlikely]] {
+//             if(errno == EINTR) continue;
+//             return -1;
+//         }
+//         return _rd;
+//     }   
+// }
+
+// ssize_t TcpStream::write(const std::span<char> buffer) noexcept {
+//     if(buffer.empty()) return 0;
+
+//     while(true) {
+//         ssize_t _wd = ::write(this->fd, buffer.data(), buffer.size());
+
+//         if(_wd < 0) [[unlikely]] {
+//             if(errno == EINTR) continue;
+//             return -1;
+//         }
+
+//         return _wd;
+//     }
+// }
+
+
+IoResult TcpStream::read(std::span<char> buffer) noexcept {
+    if(buffer.empty()) return IoResult{.bytes=0, .serr=0, .result=IoStatus::Data};
+
     while(true) {
-        ssize_t _rd = ::read(this->fd, buffer.data(), buffer.size());
-        if(_rd < 0) [[unlikely]] {
-            if(errno == EINTR) continue;
-            return -1;
+        ssize_t n = ::read(this->fd, buffer.data(), buffer.size());
+        if(n > 0) {
+            return IoResult{
+                .bytes = static_cast<size_t>(n),
+                .serr = 0,
+                .result = IoStatus::Data,
+            };
         }
-        return _rd;
-    }   
+
+        if(n == 0) return IoResult{.bytes=0, .serr=0, .result=IoStatus::Closed};
+        
+        // n < 0
+        switch(errno) {
+            case EINTR:
+                continue;
+            case EAGAIN:
+            #if EAGAIN != EWOULDBLOCK
+            case EWOULDBLOCK:
+            #endif
+                return IoResult{.bytes=0, .serr=errno, .result=IoStatus::WouldBlock};
+            default:
+                return IoResult{.bytes=0, .serr=errno, .result=IoStatus::Error};
+        }
+    }
 }
 
-ssize_t TcpStream::write(const std::span<char> buffer) noexcept {
-    if(buffer.empty()) return 0;
+IoResult TcpStream::write(const std::span<char> buffer) noexcept {
+    if(buffer.empty()) return IoResult{.bytes=0, .serr=0, .result=IoStatus::Data};
 
     while(true) {
-        ssize_t _wd = ::write(this->fd, buffer.data(), buffer.size());
+        ssize_t n = ::send(this->fd, buffer.data(), buffer.size(), MSG_NOSIGNAL);
 
-        if(_wd < 0) [[unlikely]] {
-            if(errno == EINTR) continue;
-            return -1;
+        if(n > 0) return IoResult{.bytes=static_cast<size_t>(n), .serr=0, .result=IoStatus::Data};
+        if(n == 0) return IoResult{.bytes=0, .serr=0, .result=IoStatus::Error};
+
+        // n < 0
+        switch (errno)
+        {
+        case EINTR:
+            continue;
+        case EAGAIN:
+        #if EAGAIN != EWOULDBLOCK
+        case EWOULDBLOCK
+        #endif
+            return IoResult{.bytes=0, .serr=errno, .result=IoStatus::WouldBlock};
+        default:
+            return IoResult{.bytes=0, .serr=errno, .result=IoStatus::Error};
         }
-
-        return _wd;
     }
 }
 
@@ -136,7 +192,7 @@ TcpListener::~TcpListener() {
 
 TcpListener TcpListener::bind(const SocketAddr& addr) {
     int fd = ::socket(AF_INET, SOCK_STREAM, 0);
-    if(fd < 0) throw std::system_error(std::make_error_code(std::errc::bad_file_descriptor));
+    if(fd < 0) throw std::system_error(errno, std::generic_category(), "socket");
 
     {
         int opt = 1;
@@ -144,16 +200,29 @@ TcpListener TcpListener::bind(const SocketAddr& addr) {
     }
 
     if(::bind(fd, &addr.as_sockaddr(), addr.as_socklen_t()) < 0) {
+        int serr = errno;
         ::close(fd);
-        throw std::system_error(std::make_error_code(std::errc::address_in_use));
+        throw std::system_error(serr, std::generic_category(), "bind");
     }
 
     if(::listen(fd, SOMAXCONN) < 0) {
+        int serr = errno;
         ::close(fd);
-        throw std::system_error(std::make_error_code(std::errc::connection_refused));
+        throw std::system_error(serr, std::generic_category(), "listen");
     }
+
+    // Реальный адрес
+    // Актуален, если передать порт 0
+    sockaddr_in sin {};
+    socklen_t slen = sizeof(sin);
     
-    return TcpListener(addr, fd);
+    if(::getsockname(fd, reinterpret_cast<sockaddr*>(&sin), &slen) < 0) {
+        int serr = errno;
+        ::close(fd);
+        throw std::system_error(serr, std::generic_category(), "getsockname");
+    }
+
+    return TcpListener(SocketAddr(sin), fd);
 }
 
 TcpStream TcpListener::accept() {
