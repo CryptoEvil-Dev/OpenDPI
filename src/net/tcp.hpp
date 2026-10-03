@@ -3,10 +3,31 @@
 
 namespace net {
 
+
+enum class IoStatus : uint8_t {
+    Data,
+    WouldBlock,
+    Closed,
+    Error,
+};
+
+struct IoResult {
+    size_t   bytes  = 0;
+    int      serr   = 0;
+    IoStatus result = IoStatus::Data;
+
+    constexpr bool ok() const noexcept { return result == IoStatus::Data; }
+    constexpr bool would_block() const noexcept { return result == IoStatus::WouldBlock; }
+    constexpr bool closed() const noexcept { return result == IoStatus::Closed; }
+    constexpr bool error() const noexcept { return result == IoStatus::Error; }
+};
+
+
+
 class TcpStream {
 public:
     TcpStream(const TcpStream&) = delete;
-    TcpStream(TcpStream&& other) noexcept : fd(std::move(other.fd)), peer(std::move(other.peer)) {};
+    TcpStream(TcpStream&& other) noexcept;
 
     ~TcpStream();
 
@@ -17,8 +38,8 @@ public:
 
     [[nodiscard]] SocketAddr peer_addr() const noexcept;
 
-    ssize_t read(std::span<char> buffer) noexcept;
-    ssize_t write(const std::span<char> buffer) noexcept;
+    IoResult read(std::span<char> buffer) noexcept;
+    IoResult write(const std::span<char> buffer) noexcept;
 
     bool set_nonblocking(bool flag);
     [[nodiscard]] int descriptor() const noexcept;
@@ -36,7 +57,7 @@ private:
 class TcpListener {
 public:
     TcpListener(const TcpListener&) = delete;
-    TcpListener(TcpListener&& other) noexcept : fd(std::move(other.fd)), addr(std::move(other.addr)) {};
+    TcpListener(TcpListener&& other) noexcept;
 
     ~TcpListener();
 
@@ -57,5 +78,9 @@ private:
     int fd;
     SocketAddr addr;
 };
+
+
+static_assert(sizeof(IoStatus) <= 16, "IoStatus must fit in two register to avoid sret");
+
 
 }
