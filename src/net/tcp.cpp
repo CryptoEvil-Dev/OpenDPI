@@ -24,8 +24,9 @@ TcpStream& TcpStream::operator = (TcpStream&& other) noexcept {
     return *this;
 }
 
-TcpStream TcpStream::connect(net::SocketAddr conn) {
+TcpStream TcpStream::connect(const net::SocketAddr& conn) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if(fd < 0) throw std::system_error(errno, std::generic_category(), "socket");
     if(::connect(fd, &conn.as_sockaddr(), conn.as_socklen_t()) < 0) {
         int serr = errno;
         ::close(fd);
@@ -55,6 +56,21 @@ TcpStream TcpStream::connect(net::SocketAddr conn) {
             default:
                 throw std::runtime_error("[UNDEF]: " + std::to_string(serr));
         }
+    }
+
+    return TcpStream(fd, conn);
+}
+
+TcpStream TcpStream::connect_nonblocking(const net::SocketAddr& conn) {
+    int fd = socket(AF_INET, SOCK_STREAM | O_NONBLOCK, 0);
+    if(fd < 0) throw std::system_error(errno, std::generic_category(), "socket");
+
+    int res = (::connect(fd, &conn.as_sockaddr(), conn.as_socklen_t()));
+    if(res == 0) return TcpStream(fd, conn);
+    if(errno != EINPROGRESS) {
+        int serr = errno;
+        ::close(fd);
+        throw std::system_error(errno, std::generic_category(), "connect");
     }
 
     return TcpStream(fd, conn);

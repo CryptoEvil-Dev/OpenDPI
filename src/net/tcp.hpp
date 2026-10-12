@@ -34,7 +34,8 @@ public:
     TcpStream& operator = (const TcpStream&) = delete;
     TcpStream& operator = (TcpStream&&) noexcept;
 
-    static TcpStream connect(net::SocketAddr conn);
+    static TcpStream connect(const net::SocketAddr& conn);
+    static TcpStream connect_nonblocking(const net::SocketAddr& conn);
 
     [[nodiscard]] SocketAddr peer_addr() const noexcept;
 
