@@ -68,7 +68,6 @@ public:
     [[nodiscard]] TcpStream accept();
     [[nodiscard]] static TcpListener bind(const SocketAddr& addr);
 
-    // NO RECOMENDED!
     bool set_nonblocking(bool flag);
     [[nodiscard]] int descriptor() const noexcept;
     [[nodiscard]] SocketAddr address() const noexcept;

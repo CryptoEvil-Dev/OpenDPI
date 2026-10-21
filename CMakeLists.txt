@@ -28,6 +28,7 @@ endif()
 
 add_subdirectory(src/net)
 add_subdirectory(src/conf)
+add_subdirectory(src/event)
 add_executable(main main.cpp)
 target_link_libraries(main PRIVATE netlib conflib)
 

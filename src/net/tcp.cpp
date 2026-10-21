@@ -81,34 +81,6 @@ SocketAddr TcpStream::peer_addr() const noexcept {
 }
 
 
-// ssize_t TcpStream::read(std::span<char> buffer) noexcept {
-//     if(buffer.empty()) return 0;
-//     while(true) {
-//         ssize_t _rd = ::read(this->fd, buffer.data(), buffer.size());
-//         if(_rd < 0) [[unlikely]] {
-//             if(errno == EINTR) continue;
-//             return -1;
-//         }
-//         return _rd;
-//     }   
-// }
-
-// ssize_t TcpStream::write(const std::span<char> buffer) noexcept {
-//     if(buffer.empty()) return 0;
-
-//     while(true) {
-//         ssize_t _wd = ::write(this->fd, buffer.data(), buffer.size());
-
-//         if(_wd < 0) [[unlikely]] {
-//             if(errno == EINTR) continue;
-//             return -1;
-//         }
-
-//         return _wd;
-//     }
-// }
-
-
 IoResult TcpStream::read(std::span<char> buffer) noexcept {
     if(buffer.empty()) return IoResult{.bytes=0, .serr=0, .result=IoStatus::Data};
 
@@ -212,7 +184,16 @@ TcpListener TcpListener::bind(const SocketAddr& addr) {
 
     {
         int opt = 1;
-        ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+        if(::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+            int serr = errno;
+            ::close(fd);
+            throw std::system_error(serr, std::generic_category(), "setsockopt(SO_REUSEADDR)");
+        }
+        if(::setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
+            int serr = errno;
+            ::close(fd);
+            throw std::system_error(serr, std::generic_category(), "setsockopt(SO_REUSEPORT)");
+        }
     }
 
     if(::bind(fd, &addr.as_sockaddr(), addr.as_socklen_t()) < 0) {
@@ -240,6 +221,7 @@ TcpListener TcpListener::bind(const SocketAddr& addr) {
 
     return TcpListener(SocketAddr(sin), fd);
 }
+
 
 TcpStream TcpListener::accept() {
     if(this->fd == -1) throw std::system_error(std::make_error_code(std::errc::bad_file_descriptor));
