@@ -144,7 +144,7 @@ inline SchemaValidator& SchemaValidator::check_numeric(const IConfigReader& read
         return *this;
     }
     if(constraint.max && value > *constraint.max) {
-        this->_res.append(path, "value is too big"); // Исправили "too bigger"
+        this->_res.append(path, "value is too big");
     }
     if(constraint.min && value < *constraint.min) {
         this->_res.append(path, "value is too small");

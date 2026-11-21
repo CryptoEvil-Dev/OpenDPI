@@ -3,6 +3,7 @@ project(dpi LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_BUILD_TYPE Debug CACHE STRING "DEBUG." FORCE)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     add_compile_options(
@@ -27,6 +28,7 @@ endif()
 
 add_subdirectory(src/net)
 add_subdirectory(src/conf)
+add_subdirectory(src/event)
 add_executable(main main.cpp)
 target_link_libraries(main PRIVATE netlib conflib)
 

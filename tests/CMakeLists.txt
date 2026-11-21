@@ -11,3 +11,4 @@ include(GoogleTest)
 
 add_subdirectory(net)
 add_subdirectory(conf)
+add_subdirectory(event)
