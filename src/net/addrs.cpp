@@ -16,7 +16,7 @@ namespace net {
             saddr.sin_family = AF_INET;
             {
                 int pton_stat = inet_pton(AF_INET, addr_part.c_str(), &saddr.sin_addr);
-                if(pton_stat == 0) {
+                if(pton_stat == 0) [[unlikely]] {
                     if(!addr_part.empty() && addr_part.back() == '.')
                         throw std::invalid_argument("IP address cannot end with a dot");
                     

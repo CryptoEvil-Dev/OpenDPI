@@ -19,7 +19,6 @@ EventCtl::EventCtl() {
         }
     }
 
-    // this->local_ev.resize(max_events);
     this->epfd = epoll_create1(EPOLL_CLOEXEC);
     if(this->epfd == -1) {
         throw std::runtime_error("epoll_create1 failed");
@@ -118,9 +117,9 @@ void EventCtl::run() {
                 auto *h = static_cast<IEventHandler*>(this->events[n].data.ptr);
                 uint32_t ev = this->events[n].events;
                 if(ev & EPOLLIN) h->on_read(*this);
-                if(ev & EPOLLOUT) h->on_write(*this);
-                if(ev & EPOLLHUP) h->on_hup(*this);
-                if(ev & EPOLLERR) h->on_err(*this);
+                else if(ev & EPOLLOUT) h->on_write(*this);
+                else if(ev & EPOLLHUP) h->on_hup(*this);
+                else if(ev & EPOLLERR) h->on_err(*this);
             }
     }
 }

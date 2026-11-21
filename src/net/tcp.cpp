@@ -70,7 +70,7 @@ TcpStream TcpStream::connect_nonblocking(const net::SocketAddr& conn) {
     if(errno != EINPROGRESS) {
         int serr = errno;
         ::close(fd);
-        throw std::system_error(errno, std::generic_category(), "connect");
+        throw std::system_error(serr, std::generic_category(), "connect");
     }
 
     return TcpStream(fd, conn);
